@@ -35,7 +35,6 @@ A trello clone task manager app has built with React.js for frontend and Nest.js
 ```
 PORT=4000
 DATABASE_URL=
-DIRECT_URL=
 JWT_SECRET=
 REFRESH_JWT_SECRET=
 ```
