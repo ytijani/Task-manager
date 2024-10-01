@@ -1,0 +1,98 @@
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useAuth } from '../context/AuthContextProvider';
+import { z } from 'zod';
+import submitActivity from '../lib/submitActivity';
+import refreshTokenHandler from '../lib/refreshTokenHandler';
+import { TList } from '../types/list.type';
+import { toast } from 'react-toastify';
+
+const formSchema = z.object({
+  list: z.string().min(1, 'List is required').trim()
+});
+
+type formType = z.infer<typeof formSchema>;
+
+type useMutationListUpdateProps = {
+  toggleModal: () => void;
+  workspaceId: string | undefined;
+  boardId: string | undefined;
+  listId: string | undefined;
+};
+
+const useMutationListUpdate = ({
+  toggleModal,
+  workspaceId,
+  boardId,
+  listId
+}: useMutationListUpdateProps) => {
+  const queryClient = useQueryClient();
+  const { accessToken, refreshToken, setToken, clearToken } =
+    useAuth();
+
+  const mutation = useMutation({
+    mutationFn: async (data: formType) => {
+      if (!accessToken) {
+        throw new Error('Access token not found');
+      }
+
+      if (!refreshToken) {
+        throw new Error('Refresh token not found');
+      }
+
+      const accessT = await refreshTokenHandler(
+        accessToken,
+        refreshToken,
+        setToken,
+        clearToken
+      );
+
+      const responseData: TList = await submitHandler(data, accessT);
+
+      await submitActivity(
+        `${import.meta.env.VITE_API_WORKSPACES}`,
+        workspaceId!,
+        responseData.title,
+        'list',
+        'updated',
+        accessT
+      );
+
+      return responseData;
+    },
+    onSuccess: (data: TList) => {
+      toast.success(`${data.title} is successfully updated`);
+      toggleModal();
+      // Invalidate and refetch
+      queryClient.invalidateQueries({ queryKey: ['board', boardId] });
+    }
+  });
+
+  const submitHandler = async (
+    data: formType,
+    token: string | null
+  ) => {
+    const response = await fetch(
+      `${import.meta.env.VITE_API_LISTS}/${listId}`,
+      {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: 'Bearer ' + token
+        },
+        body: JSON.stringify({
+          title: data.list
+        })
+      }
+    );
+
+    const body = await response.json();
+
+    return body;
+  };
+
+  return {
+    ...mutation
+  };
+};
+
+export default useMutationListUpdate;
